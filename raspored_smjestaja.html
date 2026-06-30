@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+<meta charset="UTF-8">
+<title>Raspored smještaja - svadba</title>
+<style>
+  :root{
+    --bg:#faf7f2; --card:#ffffff; --accent:#8a6d52; --accent-dark:#5c4632;
+    --line:#e7ddd0; --text:#3a3530; --muted:#8a8278; --danger:#b85c5c; --ok:#6b8e6b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family: "Georgia", "Segoe UI", serif;
+    background:var(--bg); color:var(--text);
+    margin:0; padding:24px; max-width:1100px; margin:0 auto;
+  }
+  h1{font-size:1.6em; margin-bottom:4px; color:var(--accent-dark);}
+  .sub{color:var(--muted); margin-bottom:24px; font-size:.95em;}
+  .grid{display:grid; grid-template-columns: 1fr 1fr; gap:24px;}
+  @media (max-width:800px){.grid{grid-template-columns:1fr;}}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px;}
+  .card h2{margin-top:0; font-size:1.1em; color:var(--accent-dark); border-bottom:1px solid var(--line); padding-bottom:8px;}
+  label{display:block; font-size:.85em; color:var(--muted); margin-bottom:3px;}
+  input, select{
+    width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px;
+    font-family:inherit; font-size:.95em; margin-bottom:10px; background:#fffdfb;
+  }
+  .row{display:flex; gap:8px;}
+  .row > div{flex:1;}
+  button{
+    background:var(--accent); color:white; border:none; border-radius:6px;
+    padding:9px 14px; cursor:pointer; font-size:.9em; font-family:inherit;
+  }
+  button:hover{background:var(--accent-dark);}
+  button.secondary{background:transparent; color:var(--accent-dark); border:1px solid var(--accent);}
+  button.danger{background:transparent; color:var(--danger); border:1px solid var(--danger); padding:4px 8px; font-size:.8em;}
+  .list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 10px; border:1px solid var(--line); border-radius:6px; margin-bottom:6px; background:#fffdfb;
+  }
+  .list-item .meta{font-size:.8em; color:var(--muted);}
+  .item-actions{display:flex; gap:6px; flex-shrink:0;}
+  button.edit{background:transparent; color:var(--accent-dark); border:1px solid var(--accent); padding:4px 8px; font-size:.8em;}
+  .edit-form{background:#f3ece2; border:1px solid var(--accent); border-radius:6px; padding:10px; margin-bottom:6px;}
+  .edit-form .row{margin-bottom:0;}
+  .edit-form-actions{display:flex; gap:8px; margin-top:8px;}
+  .actions{margin:14px 0; display:flex; gap:10px; flex-wrap:wrap;}
+  .room-block{
+    border:1px solid var(--line); border-radius:8px; margin-bottom:10px; overflow:hidden;
+  }
+  .room-head{
+    background:#f3ece2; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;
+    font-weight:bold; font-size:.9em;
+  }
+  .room-head .cap-ok{color:var(--ok);}
+  .room-head .cap-over{color:var(--danger);}
+  .room-body{padding:8px 12px; min-height:20px;}
+  .guest-chip{
+    display:inline-flex; align-items:center; gap:6px; background:#eee4d6; border-radius:14px;
+    padding:4px 10px; margin:3px; font-size:.85em;
+  }
+  .guest-chip button{padding:0 4px; background:transparent; color:var(--danger); font-size:1em; line-height:1;}
+  .unassigned-pool{
+    border:1px dashed var(--line); border-radius:8px; padding:10px; min-height:40px;
+  }
+  select.assign-select{margin:0; padding:4px 6px; font-size:.85em; width:auto;}
+  .empty{color:var(--muted); font-style:italic; font-size:.85em;}
+  .toolbar-top{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
+  .status{font-size:.85em; color:var(--muted);}
+</style>
+</head>
+<body>
+
+<h1>🌿 Raspored smještaja za svadbu</h1>
+<div class="sub">Dodaj grupe gostiju i sobe, pa klikni "Automatski rasporedi" — nakon toga ručno doradi izuzetke.</div>
+
+<div class="toolbar-top">
+  <div class="status" id="status">Učitavanje...</div>
+  <div>
+    <button class="secondary" onclick="exportData()">Izvezi (kopiraj tekst)</button>
+  </div>
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>Grupe gostiju</h2>
+    <div class="row">
+      <div>
+        <label>Naziv grupe (npr. "Porodica Marić")</label>
+        <input id="g-name" placeholder="Ime grupe ili osobe">
+      </div>
+      <div style="flex:0 0 90px;">
+        <label>Broj osoba</label>
+        <input id="g-size" type="number" min="1" value="1">
+      </div>
+    </div>
+    <label>Napomena (opciono — npr. "blizu roditelja", "starija osoba")</label>
+    <input id="g-note" placeholder="napomena">
+    <button onclick="addGuestGroup()">+ Dodaj grupu</button>
+
+    <div id="guest-list" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Smještaji / sobe</h2>
+    <div class="row">
+      <div>
+        <label>Lokacija</label>
+        <input id="r-location" placeholder="npr. Hotel Park">
+      </div>
+      <div>
+        <label>Naziv sobe</label>
+        <input id="r-name" placeholder="npr. Soba 1">
+      </div>
+      <div style="flex:0 0 90px;">
+        <label>Kapacitet</label>
+        <input id="r-cap" type="number" min="1" value="2">
+      </div>
+    </div>
+    <button onclick="addRoom()">+ Dodaj sobu</button>
+
+    <div id="room-config-list" style="margin-top:14px;"></div>
+  </div>
+
+</div>
+
+<div class="actions">
+  <button onclick="autoAssign()">🪄 Automatski rasporedi</button>
+  <button class="secondary" onclick="clearAssignments()">Resetuj raspored (zadrži goste i sobe)</button>
+  <button class="secondary" onclick="clearAll()">Obriši sve</button>
+</div>
+
+<div class="card">
+  <h2>Raspored po sobama</h2>
+  <div id="rooms-display"></div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2>Nerasporedeni gosti</h2>
+  <div id="unassigned-display" class="unassigned-pool"></div>
+</div>
+
+<script>
+let state = { guests: [], rooms: [] };
+let nextGuestId = 1;
+let nextRoomId = 1;
+let editingGuestId = null;
+let editingRoomId = null;
+
+async function loadState(){
+  try{
+    const res = await window.storage.get('wedding-rooming-state', false);
+    if(res && res.value){
+      state = JSON.parse(res.value);
+      nextGuestId = Math.max(1, ...state.guests.map(g=>g.id+1), 1);
+      nextRoomId = Math.max(1, ...state.rooms.map(r=>r.id+1), 1);
+    }
+  }catch(e){ /* no saved state yet */ }
+  renderAll();
+  document.getElementById('status').textContent = 'Podaci se čuvaju automatski.';
+}
+
+async function saveState(){
+  try{
+    await window.storage.set('wedding-rooming-state', JSON.stringify(state), false);
+  }catch(e){ console.error('Greška pri čuvanju:', e); }
+}
+
+function addGuestGroup(){
+  const name = document.getElementById('g-name').value.trim();
+  const size = parseInt(document.getElementById('g-size').value) || 1;
+  const note = document.getElementById('g-note').value.trim();
+  if(!name){ alert('Unesi naziv grupe.'); return; }
+  state.guests.push({ id: nextGuestId++, name, size, note, roomId: null });
+  document.getElementById('g-name').value='';
+  document.getElementById('g-size').value=1;
+  document.getElementById('g-note').value='';
+  saveState(); renderAll();
+}
+
+function startEditGuest(id){
+  editingGuestId = id;
+  renderGuestList();
+}
+
+function cancelEditGuest(){
+  editingGuestId = null;
+  renderGuestList();
+}
+
+function saveEditGuest(id){
+  const name = document.getElementById('edit-g-name-'+id).value.trim();
+  const size = parseInt(document.getElementById('edit-g-size-'+id).value) || 1;
+  const note = document.getElementById('edit-g-note-'+id).value.trim();
+  if(!name){ alert('Naziv ne može biti prazan.'); return; }
+  const g = state.guests.find(x=>x.id===id);
+  g.name = name; g.size = size; g.note = note;
+  editingGuestId = null;
+  saveState(); renderAll();
+}
+
+function startEditRoom(id){
+  editingRoomId = id;
+  renderRoomConfigList();
+}
+
+function cancelEditRoom(){
+  editingRoomId = null;
+  renderRoomConfigList();
+}
+
+function saveEditRoom(id){
+  const location = document.getElementById('edit-r-location-'+id).value.trim();
+  const name = document.getElementById('edit-r-name-'+id).value.trim();
+  const cap = parseInt(document.getElementById('edit-r-cap-'+id).value) || 1;
+  if(!location || !name){ alert('Lokacija i naziv ne mogu biti prazni.'); return; }
+  const r = state.rooms.find(x=>x.id===id);
+  r.location = location; r.name = name; r.cap = cap;
+  editingRoomId = null;
+  saveState(); renderAll();
+}
+
+function removeGuestGroup(id){
+  state.guests = state.guests.filter(g=>g.id!==id);
+  saveState(); renderAll();
+}
+
+function addRoom(){
+  const location = document.getElementById('r-location').value.trim();
+  const name = document.getElementById('r-name').value.trim();
+  const cap = parseInt(document.getElementById('r-cap').value) || 1;
+  if(!location || !name){ alert('Unesi lokaciju i naziv sobe.'); return; }
+  state.rooms.push({ id: nextRoomId++, location, name, cap });
+  document.getElementById('r-location').value='';
+  document.getElementById('r-name').value='';
+  document.getElementById('r-cap').value=2;
+  saveState(); renderAll();
+}
+
+function removeRoom(id){
+  state.guests.forEach(g=>{ if(g.roomId===id) g.roomId=null; });
+  state.rooms = state.rooms.filter(r=>r.id!==id);
+  saveState(); renderAll();
+}
+
+function assignGuestToRoom(guestId, roomId){
+  const g = state.guests.find(x=>x.id===guestId);
+  g.roomId = roomId === '' ? null : parseInt(roomId);
+  saveState(); renderAll();
+}
+
+function roomOccupancy(roomId){
+  return state.guests.filter(g=>g.roomId===roomId).reduce((s,g)=>s+g.size,0);
+}
+
+function autoAssign(){
+  // reset assignments first for a clean greedy pass over currently unassigned
+  const unassigned = state.guests.filter(g=>g.roomId===null).sort((a,b)=>b.size-a.size);
+  const roomsSorted = [...state.rooms]; // keep insertion order, but we recompute free space each time
+  for(const g of unassigned){
+    // find room with enough free space, preferring tightest fit (least leftover space)
+    let best = null, bestLeftover = Infinity;
+    for(const r of roomsSorted){
+      const free = r.cap - roomOccupancy(r.id);
+      if(free >= g.size && (free - g.size) < bestLeftover){
+        best = r; bestLeftover = free - g.size;
+      }
+    }
+    if(best){ g.roomId = best.id; }
+  }
+  saveState(); renderAll();
+}
+
+function clearAssignments(){
+  state.guests.forEach(g=>g.roomId=null);
+  saveState(); renderAll();
+}
+
+function clearAll(){
+  if(!confirm('Sigurno obrisati sve podatke?')) return;
+  state = { guests: [], rooms: [] };
+  saveState(); renderAll();
+}
+
+function renderAll(){
+  renderGuestList();
+  renderRoomConfigList();
+  renderRoomsDisplay();
+  renderUnassigned();
+}
+
+function renderGuestList(){
+  const el = document.getElementById('guest-list');
+  if(state.guests.length===0){ el.innerHTML = '<div class="empty">Još nema dodanih grupa.</div>'; return; }
+  el.innerHTML = state.guests.map(g=>{
+    if(editingGuestId === g.id){
+      return `<div class="edit-form">
+        <div class="row">
+          <div><label>Naziv</label><input id="edit-g-name-${g.id}" value="${escapeHtml(g.name)}"></div>
+          <div style="flex:0 0 90px;"><label>Broj osoba</label><input id="edit-g-size-${g.id}" type="number" min="1" value="${g.size}"></div>
+        </div>
+        <label>Napomena</label>
+        <input id="edit-g-note-${g.id}" value="${escapeHtml(g.note||'')}">
+        <div class="edit-form-actions">
+          <button onclick="saveEditGuest(${g.id})">Sačuvaj</button>
+          <button class="secondary" onclick="cancelEditGuest()">Otkaži</button>
+        </div>
+      </div>`;
+    }
+    const room = state.rooms.find(r=>r.id===g.roomId);
+    return `<div class="list-item">
+      <div>
+        <strong>${escapeHtml(g.name)}</strong> (${g.size} ${g.size===1?'osoba':'osoba/e'})
+        ${g.note? `<div class="meta">${escapeHtml(g.note)}</div>`:''}
+        <div class="meta">${room? '📍 '+escapeHtml(room.location)+' — '+escapeHtml(room.name) : 'nerasporeden/a'}</div>
+      </div>
+      <div class="item-actions">
+        <button class="edit" onclick="startEditGuest(${g.id})">uredi</button>
+        <button class="danger" onclick="removeGuestGroup(${g.id})">ukloni</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRoomConfigList(){
+  const el = document.getElementById('room-config-list');
+  if(state.rooms.length===0){ el.innerHTML = '<div class="empty">Još nema dodanih soba.</div>'; return; }
+  el.innerHTML = state.rooms.map(r=>{
+    if(editingRoomId === r.id){
+      return `<div class="edit-form">
+        <div class="row">
+          <div><label>Lokacija</label><input id="edit-r-location-${r.id}" value="${escapeHtml(r.location)}"></div>
+          <div><label>Naziv sobe</label><input id="edit-r-name-${r.id}" value="${escapeHtml(r.name)}"></div>
+          <div style="flex:0 0 90px;"><label>Kapacitet</label><input id="edit-r-cap-${r.id}" type="number" min="1" value="${r.cap}"></div>
+        </div>
+        <div class="edit-form-actions">
+          <button onclick="saveEditRoom(${r.id})">Sačuvaj</button>
+          <button class="secondary" onclick="cancelEditRoom()">Otkaži</button>
+        </div>
+      </div>`;
+    }
+    const occ = roomOccupancy(r.id);
+    return `<div class="list-item">
+      <div>
+        <strong>${escapeHtml(r.location)}</strong> — ${escapeHtml(r.name)}
+        <div class="meta">kapacitet ${r.cap} · popunjeno ${occ}/${r.cap}</div>
+      </div>
+      <div class="item-actions">
+        <button class="edit" onclick="startEditRoom(${r.id})">uredi</button>
+        <button class="danger" onclick="removeRoom(${r.id})">ukloni</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRoomsDisplay(){
+  const el = document.getElementById('rooms-display');
+  if(state.rooms.length===0){ el.innerHTML = '<div class="empty">Dodaj sobe da bi se prikazao raspored.</div>'; return; }
+  // group by location
+  const byLoc = {};
+  state.rooms.forEach(r=>{ (byLoc[r.location] = byLoc[r.location]||[]).push(r); });
+
+  let html = '';
+  for(const loc in byLoc){
+    html += `<h3 style="margin-bottom:6px;color:var(--accent-dark);font-size:1em;">${escapeHtml(loc)}</h3>`;
+    byLoc[loc].forEach(r=>{
+      const occ = roomOccupancy(r.id);
+      const guestsHere = state.guests.filter(g=>g.roomId===r.id);
+      const capClass = occ > r.cap ? 'cap-over' : 'cap-ok';
+      html += `<div class="room-block">
+        <div class="room-head">
+          <span>${escapeHtml(r.name)}</span>
+          <span class="${capClass}">${occ}/${r.cap}</span>
+        </div>
+        <div class="room-body">
+          ${guestsHere.length===0? '<span class="empty">prazno</span>' :
+            guestsHere.map(g=>`<span class="guest-chip">${escapeHtml(g.name)} (${g.size})
+              <button onclick="assignGuestToRoom(${g.id}, '')" title="ukloni iz sobe">✕</button>
+            </span>`).join('')}
+        </div>
+      </div>`;
+    });
+  }
+  el.innerHTML = html;
+}
+
+function renderUnassigned(){
+  const el = document.getElementById('unassigned-display');
+  const unassigned = state.guests.filter(g=>g.roomId===null);
+  if(unassigned.length===0){ el.innerHTML = '<div class="empty">Svi su rasporedeni 🎉</div>'; return; }
+  el.innerHTML = unassigned.map(g=>{
+    const options = state.rooms.map(r=>{
+      const free = r.cap - roomOccupancy(r.id);
+      return `<option value="${r.id}">${escapeHtml(r.location)} - ${escapeHtml(r.name)} (slobodno ${free})</option>`;
+    }).join('');
+    return `<div class="list-item">
+      <div><strong>${escapeHtml(g.name)}</strong> (${g.size})${g.note?` <span class="meta">— ${escapeHtml(g.note)}</span>`:''}</div>
+      <select class="assign-select" onchange="assignGuestToRoom(${g.id}, this.value)">
+        <option value="">— dodijeli sobu —</option>
+        ${options}
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function exportData(){
+  let text = "RASPORED SMJEŠTAJA\\n\\n";
+  const byLoc = {};
+  state.rooms.forEach(r=>{ (byLoc[r.location] = byLoc[r.location]||[]).push(r); });
+  for(const loc in byLoc){
+    text += `${loc}\\n`;
+    byLoc[loc].forEach(r=>{
+      const guestsHere = state.guests.filter(g=>g.roomId===r.id);
+      text += `  ${r.name} (kapacitet ${r.cap}):\\n`;
+      guestsHere.forEach(g=> text += `    - ${g.name} (${g.size})${g.note? ' ['+g.note+']':''}\\n`);
+      if(guestsHere.length===0) text += `    (prazno)\\n`;
+    });
+    text += '\\n';
+  }
+  const unassigned = state.guests.filter(g=>g.roomId===null);
+  if(unassigned.length){
+    text += "NERASPOREDENI:\\n";
+    unassigned.forEach(g=> text += `  - ${g.name} (${g.size})\\n`);
+  }
+  navigator.clipboard.writeText(text).then(()=>{
+    alert('Raspored je kopiran u clipboard!');
+  }).catch(()=>{
+    prompt('Kopiraj ručno:', text);
+  });
+}
+
+loadState();
+</script>
+
+</body>
+</html>
